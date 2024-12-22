@@ -8,6 +8,7 @@ import soundfile as sf
 import numpy as np
 import pandas as pd
 from keras.models import model_from_json
+import uvicorn
 
 # Tạo ứng dụng FastAPI
 app = FastAPI()
@@ -166,3 +167,7 @@ async def process_audio(file: UploadFile = File(...)):
                     os.remove(os.path.join(root, name))
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 9090))  # Lấy cổng từ biến môi trường hoặc mặc định là 8080
+    uvicorn.run(app, host="0.0.0.0", port=port)
