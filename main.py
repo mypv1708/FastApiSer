@@ -169,5 +169,5 @@ async def process_audio(file: UploadFile = File(...)):
                     os.rmdir(os.path.join(root, name))
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 9090))  # Lấy cổng từ biến môi trường hoặc mặc định là 8080
+    port = int(os.environ.get("PORT", 9090)) 
     uvicorn.run(app, host="0.0.0.0", port=port)
