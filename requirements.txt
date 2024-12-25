@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 tensorflow
+python-multipart
 pydub
 librosa
 soundfile
