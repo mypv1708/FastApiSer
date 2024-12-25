@@ -8,10 +8,19 @@ import soundfile as sf
 import numpy as np
 import pandas as pd
 from keras.models import model_from_json
-import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 # Tạo ứng dụng FastAPI
 app = FastAPI()
+
+# Thêm middleware CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Hoặc bạn có thể chỉ định các nguồn cụ thể
+    allow_credentials=True,
+    allow_methods=["*"],  # Cho phép tất cả các phương thức (GET, POST, v.v.)
+    allow_headers=["*"],  # Cho phép tất cả các tiêu đề
+)
 
 # Load model đã huấn luyện
 json_file_path = r'saved_models/emotion_detection_cnn.json'
@@ -167,7 +176,3 @@ async def process_audio(file: UploadFile = File(...)):
                     os.remove(os.path.join(root, name))
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 9090)) 
-    uvicorn.run(app, host="0.0.0.0", port=port)
