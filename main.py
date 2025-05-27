@@ -89,7 +89,9 @@ async def process_audio(file: UploadFile = File(...)):
 
         chunk_paths = []
         for i, chunk in enumerate(chunks):
-            chunk_path = os.path.join(temp_output_dir, f"chunk_{i+1}.wav")
+            # Lấy tên file gốc không có phần mở rộng
+            original_name = os.path.splitext(original_file_name)[0]
+            chunk_path = os.path.join(temp_output_dir, f"{original_name}_chunk_{i+1}.wav")
             chunk.export(chunk_path, format="wav")
             chunk_paths.append(chunk_path)
 
@@ -131,6 +133,7 @@ async def process_audio(file: UploadFile = File(...)):
                     "file": file_name,
                     "emotion": emotions[predicted_class[0]],
                     "duration": duration,
+                    "probability": float(round(predicted_probability * 100, 2)),
                     "probability_positive": 100 - probability_negative,
                     "probability_negative": probability_negative
                 })
@@ -171,8 +174,11 @@ async def process_audio(file: UploadFile = File(...)):
     finally:
         # Xử lý tệp tạm
         if os.path.exists("temp"):
-            for root, dirs, files in os.walk("temp", topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
+            # Xóa các file trong thư mục output_chunks
+            output_chunks_dir = "temp/output_chunks"
+            if os.path.exists(output_chunks_dir):
+                for file_name in os.listdir(output_chunks_dir):
+                    file_path = os.path.join(output_chunks_dir, file_name)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                os.rmdir(output_chunks_dir)
