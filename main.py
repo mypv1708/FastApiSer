@@ -1,4 +1,5 @@
 from fastapi import FastAPI, File, UploadFile
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
@@ -9,6 +10,7 @@ import numpy as np
 import pandas as pd
 from keras.models import model_from_json
 from fastapi.middleware.cors import CORSMiddleware
+from app.api.endpoints import router
 
 # Tạo ứng dụng FastAPI
 app = FastAPI()
@@ -21,6 +23,9 @@ app.add_middleware(
     allow_methods=["*"],  # Cho phép tất cả các phương thức (GET, POST, v.v.)
     allow_headers=["*"],  # Cho phép tất cả các tiêu đề
 )
+
+# Thêm vào sau phần khởi tạo app
+app.mount("/audio", StaticFiles(directory="temp"), name="audio")
 
 # Load model đã huấn luyện
 json_file_path = r'saved_models/emotion_detection_cnn.json'
@@ -98,20 +103,22 @@ async def process_audio(file: UploadFile = File(...)):
         # Xử lý cắt đoạn âm thanh không còn khoảng lặng
         processed_output_dir = "temp/processed"
         os.makedirs(processed_output_dir, exist_ok=True)
+        processed_chunk_paths = []  # Lưu đường dẫn của các file đã xử lý
         for chunk_path in chunk_paths:
             y, sr = librosa.load(chunk_path, sr=sample_rate_s)
             y_trimmed, _ = librosa.effects.trim(y, top_db=18)
             output_path = os.path.join(processed_output_dir, os.path.basename(chunk_path))
             sf.write(output_path, y_trimmed, sr)
+            processed_chunk_paths.append(output_path)
 
         # Dự đoán cảm xúc từng file
         predictions = []
         emotion_durations = {emotion: 0 for emotion in emotions}
         total_duration = 0
 
-        for file_name in os.listdir(processed_output_dir):
-            if file_name.endswith(".wav"):
-                file_path = os.path.join(processed_output_dir, file_name)
+        for file_path in processed_chunk_paths:  # Chỉ xử lý các file chunk mới
+            if file_path.endswith(".wav"):
+                file_name = os.path.basename(file_path)
 
                 # Tính thời lượng của đoạn âm thanh
                 y, sr = librosa.load(file_path, sr=sample_rate_s)
@@ -131,11 +138,12 @@ async def process_audio(file: UploadFile = File(...)):
 
                 predictions.append({
                     "file": file_name,
+                    "file_path": f"/audio/processed/{file_name}",  # Thay đổi đường dẫn
                     "emotion": emotions[predicted_class[0]],
-                    "duration": duration,
-                    "probability": float(round(predicted_probability * 100, 2)),
-                    "probability_positive": 100 - probability_negative,
-                    "probability_negative": probability_negative
+                    "duration": round(duration, 2),
+                    "probability": round(float(predicted_probability * 100), 2),
+                    "probability_positive": round(100 - probability_negative, 2),
+                    "probability_negative": round(probability_negative, 2)
                 })
 
                 emotion_durations[emotions[predicted_class[0]]] += duration
@@ -161,6 +169,7 @@ async def process_audio(file: UploadFile = File(...)):
         return JSONResponse(content={
             "original_file": original_file_name,
             "original_duration": original_duration,
+            "original_file_path": f"/audio/{original_file_name}",  # Thay đổi đường dẫn
             "predictions_details": predictions,
             "emotion_percentages": emotion_percentages,
             "overview_percentage": {
@@ -172,13 +181,4 @@ async def process_audio(file: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
     finally:
-        # Xử lý tệp tạm
-        if os.path.exists("temp"):
-            # Xóa các file trong thư mục output_chunks
-            output_chunks_dir = "temp/output_chunks"
-            if os.path.exists(output_chunks_dir):
-                for file_name in os.listdir(output_chunks_dir):
-                    file_path = os.path.join(output_chunks_dir, file_name)
-                    if os.path.isfile(file_path):
-                        os.remove(file_path)
-                os.rmdir(output_chunks_dir)
+        pass
